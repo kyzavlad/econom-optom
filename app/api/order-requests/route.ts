@@ -38,11 +38,10 @@ export async function POST(request: Request) {
     const total = items.reduce((sum,item)=>sum+item.line_total,0)
 
     const config = getPublicSupabaseConfig()
-    if (!config) {
-      return NextResponse.json({ ok:true, persisted:false, total })
-    }
+    if (!config) return NextResponse.json({ ok:true, persisted:false, total })
+
     const supabase = createClient(config.url,config.publishableKey,{ auth:{ persistSession:false, autoRefreshToken:false } })
-    const { data, error } = await supabase.rpc('submit_order_request', {
+    const { data, error } = await supabase.rpc('econom_submit_order_request', {
       p_company_name: company,
       p_contact_name: contactName,
       p_phone: phone,
@@ -52,18 +51,18 @@ export async function POST(request: Request) {
       p_items: requested.map(line => ({ source_id:text(line.sourceId,120), boxes:Math.min(100, Math.max(1, Math.floor(Number(line.boxes)||0))) }))
     })
     if (error) {
-      console.error('order_request_rpc_failed', error.code, error.message)
+      console.error('econom_order_request_rpc_failed', error.code, error.message)
       return NextResponse.json({ ok:false, error:'save_failed' }, { status:500 })
     }
     const saved = Array.isArray(data) ? data[0] : data
     const persistedTotal = Number(saved?.total_uah ?? total)
     if (!Number.isFinite(persistedTotal) || Math.abs(persistedTotal-total) > 0.01) {
-      console.error('order_request_total_mismatch', { expected:total, persisted:persistedTotal })
+      console.error('econom_order_request_total_mismatch', { expected:total, persisted:persistedTotal })
       return NextResponse.json({ ok:false, error:'catalog_changed' }, { status:409 })
     }
     return NextResponse.json({ ok:true, persisted:true, number:saved?.number ?? null, total:persistedTotal })
   } catch (error) {
-    console.error('order_request_unhandled', error)
+    console.error('econom_order_request_unhandled', error)
     return NextResponse.json({ ok:false, error:'invalid_request' }, { status:400 })
   }
 }

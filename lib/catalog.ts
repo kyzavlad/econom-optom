@@ -40,7 +40,7 @@ function serverClient() {
 export async function getProducts(): Promise<Product[]> {
   const supabase = serverClient()
   if (!supabase) return fallbackProducts.filter(p => p.status === 'active')
-  const { data, error } = await supabase.from('products').select('source_id,sku,slug,name,category,gender,season,material,unit_price_uah,pack_size,size_grid,image_urls,source_url,is_active').eq('is_active', true).order('created_at', { ascending: true })
+  const { data, error } = await supabase.from('econom_products').select('source_id,sku,slug,name,category,gender,season,material,unit_price_uah,pack_size,size_grid,image_urls,source_url,is_active').eq('is_active', true).order('created_at', { ascending: true })
   if (error || !data?.length) return fallbackProducts.filter(p => p.status === 'active')
   return (data as DbProduct[]).map(dbToProduct)
 }
@@ -48,7 +48,7 @@ export async function getProducts(): Promise<Product[]> {
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   const supabase = serverClient()
   if (supabase) {
-    const { data, error } = await supabase.from('products').select('source_id,sku,slug,name,category,gender,season,material,unit_price_uah,pack_size,size_grid,image_urls,source_url,is_active').eq('slug', slug).eq('is_active', true).maybeSingle()
+    const { data, error } = await supabase.from('econom_products').select('source_id,sku,slug,name,category,gender,season,material,unit_price_uah,pack_size,size_grid,image_urls,source_url,is_active').eq('slug', slug).eq('is_active', true).maybeSingle()
     if (!error && data) return dbToProduct(data as DbProduct)
   }
   return fallbackProducts.find(p => p.slug === slug && p.status === 'active') ?? null

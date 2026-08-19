@@ -1,0 +1,23 @@
+name: Inspect Forsage catalog
+on:
+  push:
+    branches: [ops/forsage-catalog-inspect]
+    paths:
+      - scripts/inspect_forsage_catalog.py
+      - .github/workflows/inspect-forsage.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch and inspect page 1
+        run: python scripts/inspect_forsage_catalog.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forsage-page1
+          path: |
+            forsage-victoria-page1.html
+            forsage-victoria-page1-summary.json

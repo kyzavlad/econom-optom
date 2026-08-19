@@ -73,8 +73,7 @@ html_by_page={1:html1}
 with ThreadPoolExecutor(max_workers=8) as pool:
     futures={pool.submit(fetch,f'{BASE}?page={page}'):page for page in range(2,last_page+1)}
     for future in as_completed(futures):
-        page=futures[future]
-        html_by_page[page]=future.result()
+        html_by_page[futures[future]]=future.result()
 
 products=[]; errors=[]; page_stats=[]
 for page in range(1,last_page+1):
@@ -85,6 +84,19 @@ for page in range(1,last_page+1):
 unique={}
 for p in products: unique[p['source_id']]=p
 products=list(unique.values())
+
+detail_probe={}
+if products:
+    detail_html=fetch(products[0]['source_url'])
+    detail_text=' '.join(BeautifulSoup(detail_html,'html.parser').get_text(' ',strip=True).split())
+    needles=['Опт $','Опт грн','грн','долар','доллар','USD','UAH','Ціна','Цена','Собівартість','Себестоимость']
+    detail_probe['url']=products[0]['source_url']
+    detail_probe['matches']=[]
+    for needle in needles:
+        for m in re.finditer(re.escape(needle),detail_text,re.I):
+            detail_probe['matches'].append(detail_text[max(0,m.start()-120):m.end()+220])
+    detail_probe['matches']=detail_probe['matches'][:30]
+
 summary={
     'last_page':last_page,
     'products':len(products),
@@ -93,6 +105,7 @@ summary={
     'type_counts':Counter(p['type_slug'] for p in products).most_common(),
     'season_counts':Counter(p['season_raw'] for p in products).most_common(),
     'page_stats':page_stats,
+    'detail_probe':detail_probe,
     'sample':products[:30],
     'errors_sample':errors[:20],
 }

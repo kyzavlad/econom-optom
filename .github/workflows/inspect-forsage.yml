@@ -2,6 +2,8 @@ name: Inspect Forsage catalog
 on:
   push:
     branches: [ops/forsage-catalog-inspect]
+  pull_request:
+    branches: [main]
     paths:
       - scripts/inspect_forsage_catalog.py
       - .github/workflows/inspect-forsage.yml

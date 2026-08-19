@@ -19,7 +19,7 @@ def parse_card(a):
     href=a.get('href','')
     img=a.find('img')
     text=' '.join(a.get_text(' ',strip=True).replace('Докладніше','').split())
-    m=re.match(r'^(.*?),\s*(\d+)(?:\s*\(([^)]*)\))?,\s*([0-9]+(?:\.[0-9]+)?),\s*(.+)$',text)
+    m=re.match(r'^(.*?),\s*(\d+)(?:\s*\(([^)]*)\))?,\s*([0-9]+(?:\.[0-9]+)?)\s*,\s*(.+)$',text)
     if not m or not img or not img.get('src'):
         return None, {'href':href,'text':text,'image':img.get('src') if img else None}
     sku=m.group(1).strip()

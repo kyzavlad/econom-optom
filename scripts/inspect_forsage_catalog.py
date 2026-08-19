@@ -2,7 +2,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from collections import Counter
-import json,re,time,urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import json,re,urllib.request
 
 BASE='https://www.forsage-studio.com/victoria'
 UA={'User-Agent':'Mozilla/5.0 (compatible; ECONOM-preview-audit/1.0)'}
@@ -10,7 +11,7 @@ UA={'User-Agent':'Mozilla/5.0 (compatible; ECONOM-preview-audit/1.0)'}
 
 def fetch(url):
     req=urllib.request.Request(url,headers=UA)
-    with urllib.request.urlopen(req,timeout=30) as r:
+    with urllib.request.urlopen(req,timeout=20) as r:
         return r.read().decode('utf-8','replace')
 
 
@@ -49,29 +50,37 @@ def parse_card(a):
         'slug':tail,
     }, None
 
+
+def parse_page(page,html):
+    soup=BeautifulSoup(html,'html.parser')
+    cards=soup.select('a.card[href*="/victoria/"]')
+    products=[]; errors=[]
+    for a in cards:
+        product,error=parse_card(a)
+        if product: products.append(product)
+        else: errors.append(error)
+    return page,products,errors,len(cards)
+
 html1=fetch(BASE)
 soup1=BeautifulSoup(html1,'html.parser')
 page_nums=[1]
 for a in soup1.select('.pagination a'):
-    href=a.get('href','')
-    m=re.search(r'[?&]page=(\d+)',href)
+    m=re.search(r'[?&]page=(\d+)',a.get('href',''))
     if m: page_nums.append(int(m.group(1)))
 last_page=max(page_nums)
 
+html_by_page={1:html1}
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures={pool.submit(fetch,f'{BASE}?page={page}'):page for page in range(2,last_page+1)}
+    for future in as_completed(futures):
+        page=futures[future]
+        html_by_page[page]=future.result()
+
 products=[]; errors=[]; page_stats=[]
 for page in range(1,last_page+1):
-    html=html1 if page==1 else fetch(f'{BASE}?page={page}')
-    soup=BeautifulSoup(html,'html.parser')
-    cards=soup.select('a.card[href*="/victoria/"]')
-    parsed=0
-    for a in cards:
-        product,error=parse_card(a)
-        if product:
-            products.append(product); parsed+=1
-        else:
-            errors.append(error)
-    page_stats.append({'page':page,'cards':len(cards),'parsed':parsed})
-    if page != last_page: time.sleep(0.25)
+    page,parsed,errs,cards=parse_page(page,html_by_page[page])
+    products.extend(parsed); errors.extend(errs)
+    page_stats.append({'page':page,'cards':cards,'parsed':len(parsed)})
 
 unique={}
 for p in products: unique[p['source_id']]=p

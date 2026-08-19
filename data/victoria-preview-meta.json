@@ -1,0 +1,19 @@
+{
+  "source": "https://www.forsage-studio.com/victoria",
+  "pages": 17,
+  "public_cards": 1931,
+  "fashion_products": 1922,
+  "currency": "USD",
+  "categories": {
+    "Аксессуары": 323,
+    "Одежда": 136,
+    "Обувь": 1463
+  },
+  "seasons": {
+    "Деми": 939,
+    "Лето": 872,
+    "Зима": 107,
+    "Не указано": 4
+  },
+  "missing_images": 0
+}

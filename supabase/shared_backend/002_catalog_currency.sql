@@ -31,14 +31,14 @@ begin
   with requested as (
     select line->>'source_id' source_id,(line->>'boxes')::integer boxes from jsonb_array_elements(p_items) line
   ),resolved as (
-    select p.source_id,p.sku,p.name,r.boxes,p.pack_size,p.unit_price,p.currency,
+    select p.source_id,p.sku,p.name,r.boxes,p.pack_size,p.unit_price,p.currency as item_currency,
       (p.unit_price*p.pack_size*r.boxes)::numeric(14,2) line_total
     from requested r join public.econom_products p on p.source_id=r.source_id and p.is_active=true
   )
-  select count(*),count(distinct currency),min(currency),
-    coalesce(jsonb_agg(jsonb_build_object('source_id',source_id,'sku',sku,'name',name,'boxes',boxes,'pack_size',pack_size,'unit_price',unit_price,'currency',currency,'line_total',line_total) order by source_id),'[]'::jsonb),
-    coalesce(sum(line_total),0)::numeric(14,2)
-  into v_valid_count,v_currency_count,v_currency,v_items,v_total from resolved;
+  select count(*),count(distinct x.item_currency),min(x.item_currency),
+    coalesce(jsonb_agg(jsonb_build_object('source_id',x.source_id,'sku',x.sku,'name',x.name,'boxes',x.boxes,'pack_size',x.pack_size,'unit_price',x.unit_price,'currency',x.item_currency,'line_total',x.line_total) order by x.source_id),'[]'::jsonb),
+    coalesce(sum(x.line_total),0)::numeric(14,2)
+  into v_valid_count,v_currency_count,v_currency,v_items,v_total from resolved x;
 
   if v_valid_count<>v_requested_count then raise exception 'catalog_changed'; end if;
   if v_currency_count<>1 then raise exception 'mixed_currency'; end if;

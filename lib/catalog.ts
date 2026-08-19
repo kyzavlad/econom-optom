@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { products as fallbackProducts } from '@/data/products'
 import type { Product } from '@/lib/types'
+import { getPublicSupabaseConfig } from '@/lib/public-supabase-config'
 
 type DbProduct = {
   source_id: string; sku: string; slug: string; name: string; category: string | null;
@@ -31,10 +32,9 @@ function dbToProduct(row: DbProduct): Product {
 }
 
 function serverClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  if (!url || !key) return null
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  const config = getPublicSupabaseConfig()
+  if (!config) return null
+  return createClient(config.url, config.publishableKey, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
 export async function getProducts(): Promise<Product[]> {

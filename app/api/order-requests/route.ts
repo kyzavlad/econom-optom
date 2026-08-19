@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getProducts } from '@/lib/catalog'
+import { getPublicSupabaseConfig } from '@/lib/public-supabase-config'
 
 type IncomingLine = { sourceId?: string; boxes?: number }
 type IncomingBody = {
@@ -36,21 +37,31 @@ export async function POST(request: Request) {
     if (!items.length || items.length !== requested.length) return NextResponse.json({ ok:false, error:'catalog_changed' }, { status:409 })
     const total = items.reduce((sum,item)=>sum+item.line_total,0)
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !serviceKey) {
+    const config = getPublicSupabaseConfig()
+    if (!config) {
       return NextResponse.json({ ok:true, persisted:false, total })
     }
-    const supabase = createClient(url,serviceKey,{ auth:{ persistSession:false, autoRefreshToken:false } })
-    const { data, error } = await supabase.from('order_requests').insert({
-      company_name:company, contact_name:contactName, phone, city, delivery_method:deliveryMethod, comment:comment||null,
-      total_uah:total, status:'new', items
-    }).select('number').single()
+    const supabase = createClient(config.url,config.publishableKey,{ auth:{ persistSession:false, autoRefreshToken:false } })
+    const { data, error } = await supabase.rpc('submit_order_request', {
+      p_company_name: company,
+      p_contact_name: contactName,
+      p_phone: phone,
+      p_city: city,
+      p_delivery_method: deliveryMethod,
+      p_comment: comment || null,
+      p_items: requested.map(line => ({ source_id:text(line.sourceId,120), boxes:Math.min(100, Math.max(1, Math.floor(Number(line.boxes)||0))) }))
+    })
     if (error) {
-      console.error('order_request_insert_failed', error.code, error.message)
+      console.error('order_request_rpc_failed', error.code, error.message)
       return NextResponse.json({ ok:false, error:'save_failed' }, { status:500 })
     }
-    return NextResponse.json({ ok:true, persisted:true, number:data?.number ?? null, total })
+    const saved = Array.isArray(data) ? data[0] : data
+    const persistedTotal = Number(saved?.total_uah ?? total)
+    if (!Number.isFinite(persistedTotal) || Math.abs(persistedTotal-total) > 0.01) {
+      console.error('order_request_total_mismatch', { expected:total, persisted:persistedTotal })
+      return NextResponse.json({ ok:false, error:'catalog_changed' }, { status:409 })
+    }
+    return NextResponse.json({ ok:true, persisted:true, number:saved?.number ?? null, total:persistedTotal })
   } catch (error) {
     console.error('order_request_unhandled', error)
     return NextResponse.json({ ok:false, error:'invalid_request' }, { status:400 })

@@ -1,3 +1,5 @@
+import type { Currency } from '@/lib/money'
+
 export type Product = {
   id: string
   sourceId: string
@@ -6,6 +8,7 @@ export type Product = {
   name: string
   category: string
   unitPrice: number
+  currency?: Currency
   packSize: number
   sizeGrid: string
   season: string

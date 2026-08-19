@@ -3,17 +3,21 @@
   "pages": 17,
   "public_cards": 1931,
   "fashion_products": 1922,
-  "currency": "USD",
+  "currencies": {
+    "UAH": 1919,
+    "USD": 3
+  },
   "categories": {
-    "Аксессуары": 323,
     "Одежда": 136,
-    "Обувь": 1463
+    "Обувь": 1463,
+    "Аксессуары": 323
   },
   "seasons": {
-    "Деми": 939,
     "Лето": 872,
     "Зима": 107,
+    "Деми": 939,
     "Не указано": 4
   },
-  "missing_images": 0
+  "missing_images": 0,
+  "unknown_currency": 0
 }

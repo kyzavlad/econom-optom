@@ -1,0 +1,60 @@
+from pathlib import Path
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
+import json,re,urllib.request
+
+BASE='https://www.forsage-studio.com/victoria'
+UA={'User-Agent':'Mozilla/5.0 (compatible; ECONOM-client-preview/1.0)'}
+
+TYPE_TITLES={
+'krossovki':'Кроссовки','bosonozhki':'Босоножки','shlepki':'Шлепанцы','shlepki-s':'Шлепанцы','tufli':'Туфли','tufli-baletka':'Туфли','botinki':'Ботинки','baletki':'Балетки','slipony':'Слипоны','sapogi':'Сапоги','sapogi-':'Сапоги','tapki':'Тапочки','kedy':'Кеды','sandalii':'Сандалии','uggi':'Угги','snikersy':'Сникерсы','kroksy':'Кроксы','pinetki':'Пинетки','pinetki-r-r':'Пинетки','vetnamki':'Вьетнамки','futbolnaya-obuv':'Футбольная обувь',
+'trusy':'Белье','shorty':'Шорты','kofta':'Кофта','legginsy':'Леггинсы','losiny':'Лосины','losiny-losini':'Лосины','golfy':'Гольфы','bluzka':'Блузка','kolgoty':'Колготки','plate':'Платье','bryuki':'Брюки','sportivnye-bryuki':'Спортивные брюки','rubashka':'Рубашка','kurtka':'Куртка','kurtka-kurtka-cholovicha':'Куртка','kostyum':'Костюм','futbolka':'Футболка','yubka':'Юбка','sarafan':'Сарафан','byustgalter':'Бюстгальтер','palto':'Пальто','tunika':'Туника',
+'sumka':'Сумка','ryukzak':'Рюкзак','ryukzak-meshok':'Рюкзак','noski':'Носки','noski-noski-zhinochi':'Носки','kepka':'Кепка','platok':'Платок','shapka-shapka-dlya-plavannya':'Шапка','kosmetichka':'Косметичка','klatch':'Клатч'}
+FOOTWEAR={'krossovki','bosonozhki','shlepki','shlepki-s','tufli','tufli-baletka','baletki','slipony','sapogi','sapogi-','tapki','kedy','sandalii','uggi','snikersy','kroksy','pinetki','pinetki-r-r','vetnamki','futbolnaya-obuv'}
+CLOTHING={'trusy','shorty','kofta','legginsy','losiny','losiny-losini','golfy','bluzka','kolgoty','plate','bryuki','sportivnye-bryuki','rubashka','kurtka','kurtka-kurtka-cholovicha','kostyum','futbolka','yubka','sarafan','byustgalter','palto','tunika'}
+ACCESSORIES={'sumka','ryukzak','ryukzak-meshok','noski','noski-noski-zhinochi','kepka','platok','shapka-shapka-dlya-plavannya','kosmetichka','klatch'}
+SEASONS={'демісезон':'Деми','літо':'Лето','зима':'Зима'}
+
+def fetch(url):
+    req=urllib.request.Request(url,headers=UA)
+    with urllib.request.urlopen(req,timeout=20) as r:return r.read().decode('utf-8','replace')
+
+def type_slug_from(href,sku):
+    tail=urlparse(href).path.strip('/').split('/')[-1]
+    m=re.match(r'^(\d+)-(.+)$',tail); slug=m.group(2) if m else tail
+    sku_slug=re.sub(r'[^a-z0-9]+','-',sku.lower()).strip('-')
+    if sku_slug and slug.endswith('-'+sku_slug): return slug[:-(len(sku_slug)+1)],slug,(m.group(1) if m else tail)
+    for key in sorted(TYPE_TITLES,key=len,reverse=True):
+        if slug==key or slug.startswith(key+'-'): return key,slug,(m.group(1) if m else tail)
+    return slug.split('-')[0],slug,(m.group(1) if m else tail)
+
+def parse_card(a):
+    href=a.get('href',''); img=a.find('img'); text=' '.join(a.get_text(' ',strip=True).replace('Докладніше','').split())
+    m=re.match(r'^(.*?),\s*(\d+)(?:\s*\(([^)]*)\))?,\s*([0-9]+(?:\.[0-9]+)?)(?:\s*,\s*(.+))?$',text)
+    if not m or not img or not img.get('src'): return None
+    sku=m.group(1).strip(); type_slug,slug,source_id=type_slug_from(href,sku)
+    if type_slug not in TYPE_TITLES:return None
+    category='Обувь' if type_slug in FOOTWEAR else ('Одежда' if type_slug in CLOTHING else 'Аксессуары')
+    title=TYPE_TITLES[type_slug]
+    return {'source_id':source_id,'sku':sku,'slug':slug,'name':f'{title} {sku}','category':category,'gender':'Не указано','season':SEASONS.get((m.group(5) or '').strip().lower(),'Не указано'),'material':'Уточняется','unit_price':float(m.group(4)),'currency':'USD','pack_size':int(m.group(2)),'size_grid':(m.group(3) or 'One size').strip(),'image_url':img.get('src'),'source_url':href,'type_slug':type_slug}
+
+def cards(html):return BeautifulSoup(html,'html.parser').select('a.card[href*="/victoria/"]')
+html1=fetch(BASE); soup=BeautifulSoup(html1,'html.parser'); pages=[1]
+for a in soup.select('.pagination a'):
+    m=re.search(r'[?&]page=(\d+)',a.get('href',''))
+    if m:pages.append(int(m.group(1)))
+last=max(pages); htmls={1:html1}
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures={pool.submit(fetch,f'{BASE}?page={p}'):p for p in range(2,last+1)}
+    for f in as_completed(futures):htmls[futures[f]]=f.result()
+products=[]; total_cards=0
+for p in range(1,last+1):
+    cs=cards(htmls[p]); total_cards+=len(cs); products.extend(x for x in (parse_card(a) for a in cs) if x)
+products=list({p['source_id']:p for p in products}.values())
+Path('data').mkdir(exist_ok=True)
+Path('data/victoria-preview.json').write_text(json.dumps(products,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+meta={'source':BASE,'pages':last,'public_cards':total_cards,'fashion_products':len(products),'currency':'USD','categories':dict(Counter(p['category'] for p in products)),'seasons':dict(Counter(p['season'] for p in products)),'missing_images':sum(not p['image_url'] for p in products)}
+Path('data/victoria-preview-meta.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding='utf-8')
+print(json.dumps(meta,ensure_ascii=False,indent=2))

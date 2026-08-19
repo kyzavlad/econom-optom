@@ -1,8 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { getPublicSupabaseConfig } from '@/lib/public-supabase-config'
 
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  if (!url || !key) return null
-  return createBrowserClient(url, key)
+  const config = getPublicSupabaseConfig()
+  if (!config) return null
+  return createBrowserClient(config.url, config.publishableKey)
 }

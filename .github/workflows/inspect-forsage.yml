@@ -15,11 +15,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Fetch and inspect page 1
+      - name: Install parser
+        run: python -m pip install --disable-pip-version-check beautifulsoup4==4.13.4
+      - name: Fetch and inspect all catalog pages
         run: python scripts/inspect_forsage_catalog.py
       - uses: actions/upload-artifact@v4
         with:
-          name: forsage-page1
+          name: forsage-full-catalog
           path: |
-            forsage-victoria-page1.html
-            forsage-victoria-page1-summary.json
+            forsage-victoria-full.json
+            forsage-victoria-summary.json
